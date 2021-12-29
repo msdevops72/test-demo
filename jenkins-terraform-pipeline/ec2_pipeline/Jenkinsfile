@@ -9,7 +9,7 @@ pipeline {
     environment {
         TF_HOME = tool('terraform')
         TP_LOG = "WARN"
-        PATH = "TF_HOME:PATH"
+        PATH = "$TF_HOME:$PATH"
         ACCESS_KEY = credentials('AWS_ACCESS_KEY_ID')
         SECRET_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
@@ -17,8 +17,9 @@ pipeline {
             stage('TerraformInit'){
             steps {
                 dir('jenkins-terraform-pipeline/ec2_pipeline/'){
-                    bat "terraform init -input=false"
-                    
+                    sh "terraform init -input=false"
+                    sh "echo \$PWD"
+                    sh "whoami"
                 }
             }
         }
@@ -26,7 +27,7 @@ pipeline {
         stage('TerraformFormat'){
             steps {
                 dir('jenkins-terraform-pipeline/ec2_pipeline/'){
-                    bat "terraform fmt -list=true -write=false -diff=true -check=true"
+                    sh "terraform fmt -list=true -write=false -diff=true -check=true"
                 }
             }
         }
@@ -34,7 +35,7 @@ pipeline {
         stage('TerraformValidate'){
             steps {
                 dir('jenkins-terraform-pipeline/ec2_pipeline/'){
-                    bat "terraform validate"
+                    sh "terraform validate"
                 }
             }
         }
@@ -44,12 +45,12 @@ pipeline {
                 dir('jenkins-terraform-pipeline/ec2_pipeline/'){
                     script {
                         try {
-                            bat "terraform workspace new {params.WORKSPACE}"
+                            sh "terraform workspace new ${params.WORKSPACE}"
                         } catch (err) {
-                            bat "terraform workspace select {params.WORKSPACE}"
+                            sh "terraform workspace select ${params.WORKSPACE}"
                         }
-                        bat "terraform plan -var 'access_key=ACCESS_KEY' -var 'secret_key=SECRET_KEY' \
-                        -out terraform.tfplan;echo \? > status"
+                        sh "terraform plan -var 'access_key=$ACCESS_KEY' -var 'secret_key=$SECRET_KEY' \
+                        -out terraform.tfplan;echo \$? > status"
                         stash name: "terraform-plan", includes: "terraform.tfplan"
                     }
                 }
@@ -70,7 +71,7 @@ pipeline {
                     if(apply){
                         dir('jenkins-terraform-pipeline/ec2_pipeline/'){
                             unstash "terraform-plan"
-                            bat 'terraform apply terraform.tfplan' 
+                            sh 'terraform apply terraform.tfplan' 
                         }
                     }
                 }
